@@ -1,0 +1,183 @@
+---
+title: "Plant_Health_Report"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Plant_Health_Report}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+## Plant Health Monitoring Based on Vegetation Indices from Sentinel-2 satellite image.
+
+Author:  Abran Idrees
+
+## Introduction
+
+Increased food consumption because of rapid population expansion has been observed as a worldwide challenge that necessitates novel techniques to achieve sustainable agriculture. Sustainable Development Goal 2 (SDG 2), one of the 17 global goals adopted by the United Nations in 2015, represents food security. The goal is to end hunger, improve food security and nutrition, and encourage sustainable agriculture (FAO, 2017). Remote sensing allows for more accurate, dependable, and timely crop monitoring and planning. The spectrum and multi-temporal resolutions allow for the cost-effective analysis of rapidly changing phenological variations. Using satellite images and vegetation indices (an arithmetic combination of spectral bands relating to vegetation) has shown to be an effective source of accurate data for farmers making informed decisions at various scales. Some of the globally adopted vegetation indices to monitor vegetation indices include the Normalized Difference Vegetation Index (NDVI), Normalized Difference Moisture Index (NDMI), Green Chlorophyll Index (GCI), and Normalized Difference Red Edge (NDRE).
+
+## Motivation
+
+This package provides farmers, agronomists, and stakeholders with an accessible and fast interface for assessing crop health monitoring, making intelligent decisions, and reducing fertilizer consumption. This facilitates precision farming, cost savings, and sustainable agricultural practices by offering trustworthy vegetation indices and data visualization tools. Its open-source nature facilitates cooperation and provides flexibility to changing demands, resulting in increased production and global food security.
+
+## Data description and exploration
+
+This package used a Sentinel-2 satellite image which is the land monitoring mission from the EU Copernicus Program that consists of the constellation of twin satellites Sentinel-2A and 2B. They provide fine-resolution optical imageries with global coverage and a revisit time of 5 days with satellite constellation. (Earth Online European Space Agency, 2014). Sentinel-2 images have a range of spatial resolutions of 10 m, 20 m, and 60 m. The processed Sentinel-2 image is used for this package, which is clipped, resampled to 10 m resolution, and all their bands are stacked except band 9 and band 10. However, the stacked image has the same sequence of bands as the Sentinel-2 image. 
+
+```{r setup}
+library(PlantHealth)
+library(tmap)
+```
+
+```{r}
+# Loading the Sentinel-2 stack image
+sentinel_image <- load_image(system.file("/Image/S2_image.tif", package = "PlantHealth"))
+```
+
+```{r}
+# Plot the Sentinel-2 stack image using Flase Color Combination
+Plot_FCC_Image(sentinel_image,r_band = 4, g_band = 3, b_band = 2)
+
+```
+
+## Analysis
+
+These are the following four vegetation indices are used to monitor the plant health:
+
+### 1. Plant Health 
+
+The Normalized Difference Vegetation Index (NDVI) is used for plant health which is more towards the chlorophyll content in crops. The index is based on the differences in reflectance between the near-infrared (NIR) and red regions of the electromagnetic spectrum. Its value ranges from -1 to +1. The values between (-1 to 0) represent dead plants or inanimate objects, from (0 to 0.33) represent unhealthy plants, from (0.33 to 0.66) represent moderately healthy plants, and from (0.66 to 1) represent very healthy plants.
+
+NDVI is calculated using processed Sentinel-2 image in bands 8 (NIR) and 4 (red). The plant health map is shown in Figure 2, where the red to orangish color represents the dead plant, urban area, or bare ground and the light lemon color represents the moderately healthy plant (mostly forest area lies in that range, the image used for this analysis was taken in April), but the light to dark green color represents the healthy to very healthy plants.
+
+```{r}
+# Specify the bands for red and near-infrared
+  red_band <- 4
+  nir_band <- 8
+
+  # Call the NDVI function
+  ndvi_result <- NDVI(sentinel_image, red_band, nir_band)
+  
+  # Get the range of NDVI values
+  ndvi_range <- range(ndvi_result[], na.rm = TRUE)
+
+  # Calculate the midpoint for labeling
+  midpoint <- (ndvi_range[1] + ndvi_range[2]) / 2
+
+  # Create a tmap object with the raster layer
+  tm_shape(ndvi_result) +
+    tm_raster(style = "cont", palette = "RdYlGn", midpoint = midpoint, 
+              title = "NDVI", labels = c("Low", "High")) + # Set "Low" and "High" labels
+    tm_graticules(lwd = NA) +
+    tm_scale_bar(position = c("right", "bottom")) +
+    tm_compass(type = "4star", size = 2, position = c("right", "top")) +
+    tm_layout(main.title = "Plant Health Map", main.title.position = "center",
+              frame = TRUE, legend.position = c("right", "top"), inner.margins = c(0.1, 0.04, 0.02, 0.2))
+
+```
+
+### 2.Plant water stress
+
+Plant water stress is monitored using the Normalized Difference Moisture Index (NDMI) which helps to access the vegetation moisture content. The index is based on the differences in reflectance between the near-infrared (NIR) and short-wave infrared (SWIR) regions of the electromagnetic spectrum. Its values also range from -1 to +1.  NDMI close to -1 indicates a dry surface or lack of vegetation, and values close to 0 suggest moderate vegetation moisture content, however, values close to 1 represent a high level of vegetation moisture content. 
+Band 8 (NIR) and Band 10 (SWIR) are used to calculate the NDMI from processed Sentinel-2 image. The water stress map is shown in Figure 3, where the greenish color shows the high-water stress area which is mostly urban, bare land, and dead plants. The light blue color represents moderate water stress; however, the dark blue color indicates very low water stress (high moisture content).
+
+```{r}
+# Specify the band numbers for  near-infrared and shortwave infrared bands
+nir_band <- 8
+swir_band <- 10
+
+ndmi_result <- NDMI(sentinel_image, nir_band, swir_band)
+
+ndmi_range <- range(ndmi_result[], na.rm = TRUE)
+
+  # Create break points for the legend
+  breaks <- c(ndmi_range[1], ndmi_range[2])
+
+  # Create labels for the legend
+  labels <- c("Low", "High")
+
+  # Create a tmap object with the raster layer
+  tm_shape(ndmi_result) +
+    tm_raster(style = "cont", palette = "-viridis", breaks = breaks,midpoint = NA, 
+              title = "NDMI", labels = labels) +
+    tm_graticules(lwd = NA) +
+    tm_scale_bar(position = c("right", "bottom")) +
+    tm_compass(type = "4star", size = 2, position = c("right", "top")) +
+    tm_layout(main.title = "Plant Water Stress Map", main.title.position = "center",
+              frame = TRUE, legend.position = c("right", "top"), inner.margins = c(0.1, 0.04, 0.02, 0.2))
+
+```
+
+
+### 3. Plant Stress
+
+The Green Chlorophyll Index (GCI) is used for plant stress mapping which is able to estimate the amount of chlorophyll present in the vegetation which is directly linked with plant stress. The index is based on the differences in reflectance between the near-infrared (NIR) and green regions of the electromagnetic spectrum. Its values also range from -1 to +1.  GCI values close to -1 indicate less plant stress while values close to +1 represent the high plant stress.
+Band 3 (Green) and band 8 (NIR) are used to calculate the GCI from processed Sentinel-2 image. The plant stress map is shown in Figure 4 where light lemon color shows less plant stress, however, light to dark green color represents the high plant stress which is mostly dead vegetation, bare land, and urban area.
+
+```{r}
+# Specify the band numbers for green and near-infrared bands
+green_band <- 3
+nir_band <- 8
+
+gci_result <- GCI(sentinel_image, green_band, nir_band)
+# Get the range of GCI values
+  gci_range <- range(gci_result[], na.rm = TRUE)
+
+  # Calculate the midpoint for labeling
+  midpoint <- (gci_range[1] + gci_range[2]) / 2
+
+  # Create a tmap object with the raster layer
+  tm_shape(gci_result) +
+    tm_raster(style = "cont", palette = "YlGn", midpoint = midpoint, 
+              title = "GCI", labels = c("Low", "High")) + # Set "Low" and "High" labels
+    tm_graticules(lwd = NA) +
+    tm_scale_bar(position = c("right", "bottom")) +
+    tm_compass(type = "4star", size = 2, position = c("right", "top")) +
+    tm_layout(main.title = "Plant Stress Map", main.title.position = "center",
+              frame = TRUE, legend.position = c("right", "top"), inner.margins = c(0.1, 0.04, 0.02, 0.2))
+
+
+
+```
+### 4.	Nitrogen Content
+
+The Normalized Difference Red Edge (NDRE) is used for nitrogen content mapping. The index is based on the differences in reflectance between the near-infrared (NIR) and red-edge regions of the electromagnetic spectrum. These specific wavelengths are sensitive to variations in chlorophyll, which is directly related to nitrogen content in plants. Its values also range from -1 to +1. NDRE values close to -1 indicate less nitrogen content while values close to +1 represent high nitrogen content.
+Band 5 (Red edge) and band 8 (NIR) are used to calculate the NDRE from processed Sentinel-2 image. The plant nitrogen content map is shown in Figure 5 where the blue-shaded color represents the high nitrogen content while the lemonish color indicates the low nitrogen content.
+
+```{r}
+# Specify the band numbers for  near-infrared  and rededge band
+nir_band <- 8
+rededge_band <- 5
+ndre_result <- NDRE(sentinel_image, nir_band, rededge_band)
+ndre_range <- range(ndre_result[], na.rm = TRUE)
+
+  # Create break points for the legend
+  breaks <- c(ndre_range[1], ndre_range[2])
+
+  # Create labels for the legend
+  labels <- c("Low", "High")
+
+  # Create a tmap object with the raster layer
+  tm_shape(ndre_result) +
+    tm_raster(style = "cont", palette = "Spectral", breaks = breaks,midpoint = NA, 
+              title = "NDRE", labels = labels) +
+    tm_graticules(lwd = NA) +
+    tm_scale_bar(position = c("right", "bottom")) +
+    tm_compass(type = "4star", size = 2, position = c("right", "top")) +
+    tm_layout(main.title = "Plant Nitrogen Content Map", main.title.position = "center",
+              frame = TRUE, legend.position = c("right", "top"), inner.margins = c(0.1, 0.04, 0.02, 0.2))
+
+
+
+```
+
+## Conclusion
+
+These four vegetation indicators give useful information about many elements of plant health and stress. Each index makes use of certain spectral bands and reflectance differences to provide important maps that aid in precision agriculture and environmental monitoring, allowing for better-informed decisions for sustainable and efficient plant development.
+
+
+## References
+
+1. Dhillon, M. S., Dahms, T., Kübert-Flock, C., Steffan-Dewenter, I., Zhang, J., & Ullmann, T. (2022). Spatiotemporal fusion modelling using STARFM: Examples of Landsat 8 and Sentinel-2 NDVI in Bavaria. Remote Sensing, 14(3), 677. https://doi.org/10.3390/rs14030677
+2. Strashok, O., Ziemiańska, M., & Strashok, V. (2022). Evaluation and correlation of normalized vegetation index and moisture index in Kyiv (2017–2021). Journal of Ecological Engineering, 23(9), 212–218. https://doi.org/10.12911/22998993/151884
+3. Nasiri, V., Darvishsefat, A. A., Arefi, H., Griess, V. C., Sadeghi, S. M. M., & Borz, S. A. (2022). Modeling forest canopy cover: a synergistic use of Sentinel-2, aerial photogrammetry data, and machine learning. Remote Sensing, 14(6), 1453. https://doi.org/10.3390/rs14061453
+
+
